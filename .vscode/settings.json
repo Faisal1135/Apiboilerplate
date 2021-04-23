@@ -21,5 +21,6 @@
             "username": "postgres",
             "password": "galib1135"
         }
-    ]
+    ],
+    "deno.enable": false
 }
