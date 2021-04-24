@@ -1,37 +1,37 @@
-import { Exclude } from 'class-transformer';
-import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
-import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BaseEntity,
+  Column,
+  Entity,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 
-@Entity()
+import * as bcypt from 'bcrypt';
+import { Exclude } from 'class-transformer';
+
+@Entity({ name: 'users' })
+@Unique(['username', 'email'])
 export class User extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
-  @MinLength(4)
-  @Column({ unique: true })
+
+  @Column()
   username: string;
 
-  @MinLength(6)
-  @Exclude()
   @Column()
-  password: string;
-
-  @Exclude()
-  @Column()
-  salt: string;
-
-  @IsEmail()
-  @Column({ unique: true })
   email: string;
 
-  @IsNotEmpty()
-  @Column({ default: 'baseuser' })
-  role: UserRole;
-}
+  @Column()
+  @Exclude()
+  password: string;
 
-export enum UserRole {
-  SuperAdmin = 'SuperAdmin',
-  Admin = 'admin',
-  Staff = 'staff',
-  BaseUser = 'baseuser',
-  InActive = 'inactive',
+  @Column()
+  @Exclude()
+  salt: string;
+
+  async validatePassword(password: string): Promise<boolean> {
+    const hash = await bcypt.hash(password, this.salt);
+
+    return hash === this.password;
+  }
 }

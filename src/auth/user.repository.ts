@@ -1,33 +1,54 @@
-import { EntityRepository, Repository } from 'typeorm';
-import { UserDto } from './dto/user.dto';
-import { User } from './user.entity';
+import {
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { ClassSerializerInterceptor, UseInterceptors } from '@nestjs/common';
+import { EntityRepository, Repository } from 'typeorm';
+import { UserDto } from './dto/auth_user.dto';
+import { JwtPayload } from './dto/jwt.payload';
+import { UserRegisterDto } from './dto/user_registraion.dto';
+import { User } from './user.entity';
 
 @EntityRepository(User)
-@UseInterceptors(ClassSerializerInterceptor)
 export class UserRepository extends Repository<User> {
-  async signUp(userDto: UserDto) {
+  async signUp(userDto: UserRegisterDto): Promise<void> {
     const { username, password, email } = userDto;
     const salt = await bcrypt.genSalt();
+    const user = new User();
 
-    const newUser = new User();
+    user.username = username;
+    user.email = email;
 
-    newUser.email = email;
-    newUser.salt = salt;
-    newUser.salt = salt;
-    newUser.username = username;
-    newUser.password = await this.hashPassword(password, salt);
+    user.salt = salt;
+    user.password = await this.hashPassword(password, salt);
 
-    await newUser.save();
-
-    delete newUser.password;
-    delete newUser.salt;
-
-    return newUser;
+    try {
+      await user.save();
+    } catch (error) {
+      if (error.code === '23505') {
+        throw new ConflictException('username is already exists');
+      } else {
+        throw new InternalServerErrorException();
+      }
+    }
   }
 
-  hashPassword(password: string, salt: string) {
+  async signIn(userDto: UserDto): Promise<JwtPayload> {
+    const { username, password } = userDto;
+
+    const user = await this.findOne({
+      where: [{ username }, { email: username }],
+    });
+
+    if (user && (await user.validatePassword(password))) {
+      const { username, id }: JwtPayload = user;
+      return { username, id };
+    } else {
+      return null;
+    }
+  }
+
+  private async hashPassword(password: string, salt: string): Promise<string> {
     return bcrypt.hash(password, salt);
   }
 }
